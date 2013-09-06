@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 import datetime
 from django.conf import settings
+from south.modelsinspector import add_introspection_rules
 
 class GraderStatus():
     failure="F"
@@ -46,6 +47,12 @@ CHARFIELD_LEN_LONG = 1024
 
 # TODO: DB settings -- utf-8, innodb, store everything in UTC
 
+class AsciiTextField(models.TextField):
+    def to_python(self, value):
+        return value.encode('ascii', 'ignore')
+
+add_introspection_rules([], ["^controller\.models\.AsciiTextField"])
+
 class Submission(models.Model):
     # controller state
     preferred_grader_type = models.CharField(max_length=2, choices=GRADER_TYPE, default="NA")
@@ -57,10 +64,10 @@ class Submission(models.Model):
     # data about the submission
     date_created = models.DateTimeField(auto_now_add=True)
     date_modified = models.DateTimeField(auto_now=True)
-    prompt = models.TextField(default="")
-    rubric = models.TextField(default="")
+    prompt = AsciiTextField(default="")
+    rubric = AsciiTextField(default="")
     initial_display = models.TextField(default="")
-    answer = models.TextField(default="")
+    answer = AsciiTextField(default="")
     # TODO: is this good enough?  unique per problem/student?
     student_id = models.CharField(max_length=CHARFIELD_LEN_SMALL, db_index = True)
 
@@ -72,7 +79,7 @@ class Submission(models.Model):
     location = models.CharField(max_length=CHARFIELD_LEN_SMALL, default="", db_index = True)
     max_score = models.IntegerField(default=1)
     course_id = models.CharField(max_length=CHARFIELD_LEN_SMALL)
-    student_response = models.TextField(default="")
+    student_response = AsciiTextField(default="")
     student_submission_time = models.DateTimeField(default=timezone.now)
 
     # xqueue details
@@ -204,7 +211,7 @@ class Submission(models.Model):
 class Grader(models.Model):
     submission = models.ForeignKey('Submission', db_index = True)
     score = models.IntegerField()
-    feedback = models.TextField()
+    feedback = AsciiTextField()
     status_code = models.CharField(max_length=1, choices=STATUS_CODES)
     date_created = models.DateTimeField(auto_now_add=True)
     date_modified = models.DateTimeField(auto_now=True)
@@ -255,7 +262,7 @@ class Grader(models.Model):
 
 class Message(models.Model):
     grader = models.ForeignKey('Grader', db_index = True)
-    message = models.TextField()
+    message =AsciiTextField()
     originator = models.CharField(max_length=CHARFIELD_LEN_SMALL)
     recipient= models.CharField(max_length=CHARFIELD_LEN_SMALL)
     message_type= models.CharField(max_length=CHARFIELD_LEN_SMALL)
@@ -303,7 +310,7 @@ class RubricItem(models.Model):
     """
 
     rubric=models.ForeignKey('Rubric', db_index = True)
-    text=models.TextField()
+    text=AsciiTextField()
     short_text=models.CharField(max_length=CHARFIELD_LEN_LONG, default="")
     comment = models.TextField(default="")
     score=models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -332,7 +339,7 @@ class RubricOption(models.Model):
     rubric_item=models.ForeignKey('RubricItem', db_index = True)
     points = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     short_text = models.CharField(max_length=CHARFIELD_LEN_SMALL, default="")
-    text = models.TextField()
+    text = AsciiTextField()
     item_number = models.IntegerField()
 
     def format_rubric_option(self):
@@ -353,5 +360,4 @@ class NotificationsSeen(models.Model):
         recent_check_time = now - datetime.timedelta(seconds=recent_notification_interval)
         seen = NotificationsSeen.objects.filter(student_id = student_id, location=location, notification_type = notification_type, date_modified__gt=recent_check_time).count()
         return seen > 0
-
 
